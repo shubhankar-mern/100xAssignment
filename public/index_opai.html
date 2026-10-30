@@ -1,0 +1,965 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Voice Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+
+    /* Voice interview visual refresh */
+    :root {
+      color-scheme: dark;
+      --bg: #080b14;
+      --panel: rgba(18, 24, 42, .78);
+      --muted: #9ca8c7;
+      --text: #f4f6ff;
+      --blue: #7c8cff;
+      --cyan: #53e4e8;
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 50% 18%, rgba(75, 91, 210, .22), transparent 38%),
+        radial-gradient(ellipse at 12% 80%, rgba(25, 176, 194, .10), transparent 34%),
+        #080b14;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .18;
+      background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, black, transparent 85%);
+    }
+
+    header {
+      position: relative;
+      z-index: 1;
+      padding: 22px 20px 8px;
+      background: transparent;
+      color: var(--text);
+      text-align: center;
+    }
+
+    header h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: #c9d2ff;
+    }
+
+    #voice-stage {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 20px 8px;
+      text-align: center;
+    }
+
+    #eyebrow {
+      color: #8794bc;
+      font-size: 11px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    #voice-title {
+      margin: 10px 0 0;
+      font-size: clamp(25px, 4vw, 38px);
+      line-height: 1.15;
+      letter-spacing: -.04em;
+      font-weight: 650;
+    }
+
+    #voice-subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    #voice-visual {
+      position: relative;
+      width: 190px;
+      height: 190px;
+      margin: 22px 0 8px;
+      display: grid;
+      place-items: center;
+      isolation: isolate;
+    }
+
+    .voice-ring {
+      position: absolute;
+      inset: 15px;
+      border: 1px solid rgba(124, 140, 255, .28);
+      border-radius: 50%;
+      transition: border-color .3s ease, transform .3s ease;
+    }
+
+    .voice-ring.ring-two { inset: 0; opacity: .6; }
+    .voice-ring.ring-three { inset: 28px; opacity: .65; }
+
+    #voice-orb {
+      position: relative;
+      width: 104px;
+      height: 104px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: white;
+      background: radial-gradient(circle at 32% 25%, #aab7ff, #6878f5 42%, #373fc0 78%, #171c54);
+      box-shadow: 0 0 35px rgba(100, 115, 255, .35), inset 0 1px 10px rgba(255,255,255,.38);
+      transition: background .35s ease, box-shadow .35s ease;
+    }
+
+    #voice-orb svg { width: 32px; height: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
+
+    #voice-visual[data-state="listening"] .voice-ring {
+      border-color: rgba(83, 228, 232, .62);
+      animation: ring-pulse 1.8s ease-out infinite;
+    }
+    #voice-visual[data-state="listening"] .ring-two { animation-delay: .6s; }
+    #voice-visual[data-state="listening"] .ring-three { animation-delay: 1.2s; }
+    #voice-visual[data-state="listening"] #voice-orb {
+      background: radial-gradient(circle at 32% 25%, #b6ffff, #38cbd0 42%, #167f9d 78%, #103b5d);
+      box-shadow: 0 0 48px rgba(53, 218, 224, .48), inset 0 1px 10px rgba(255,255,255,.45);
+      animation: orb-breathe 1.6s ease-in-out infinite;
+    }
+
+    #voice-visual[data-state="thinking"] .voice-ring { animation: think-spin 5s linear infinite; border-color: rgba(160, 140, 255, .55); }
+    #voice-visual[data-state="thinking"] #voice-orb {
+      animation: orb-breathe 1.1s ease-in-out infinite;
+      box-shadow: 0 0 55px rgba(145, 111, 255, .52), inset 0 1px 10px rgba(255,255,255,.4);
+    }
+
+    #voice-visual[data-state="speaking"] .voice-ring {
+      border-color: rgba(124, 140, 255, .68);
+      animation: ring-pulse 1.2s ease-out infinite;
+    }
+    #voice-visual[data-state="speaking"] .ring-two { animation-delay: .4s; }
+    #voice-visual[data-state="speaking"] #voice-orb {
+      animation: orb-breathe .55s ease-in-out infinite alternate;
+      box-shadow: 0 0 55px rgba(100, 115, 255, .6), inset 0 1px 10px rgba(255,255,255,.45);
+    }
+
+    @keyframes ring-pulse {
+      0% { transform: scale(.82); opacity: .75; }
+      100% { transform: scale(1.22); opacity: 0; }
+    }
+    @keyframes orb-breathe {
+      0%, 100% { transform: scale(.96); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes think-spin { to { transform: rotate(360deg); } }
+
+    #status {
+      min-height: 22px;
+      max-width: min(90vw, 600px);
+      padding: 8px 14px;
+      color: #b8c4e7;
+      font-size: 13px;
+      text-align: center;
+      border: 1px solid rgba(144, 160, 208, .15);
+      border-radius: 999px;
+      background: rgba(20, 27, 47, .68);
+      backdrop-filter: blur(12px);
+    }
+
+    #messages {
+      position: relative;
+      z-index: 1;
+      width: min(760px, calc(100% - 28px));
+      margin: 14px auto 0;
+      padding: 12px 12px 170px;
+      list-style: none;
+    }
+
+    #messages li {
+      padding: 13px 16px;
+      margin: 12px 0;
+      border-radius: 16px;
+      max-width: 86%;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    #messages .user {
+      margin-left: auto !important;
+      color: #eef2ff;
+      background: linear-gradient(135deg, rgba(79, 95, 190, .75), rgba(61, 70, 133, .75));
+      border: 1px solid rgba(155, 168, 255, .25);
+      border-bottom-right-radius: 5px;
+    }
+
+    #messages .ai {
+      color: #e8edff;
+      background: rgba(20, 27, 46, .88);
+      border: 1px solid rgba(144, 160, 208, .18);
+      border-bottom-left-radius: 5px;
+      backdrop-filter: blur(12px);
+    }
+
+    #controls {
+      position: fixed;
+      z-index: 30;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px max(14px, calc((100vw - 760px) / 2));
+      background: rgba(8, 11, 20, .88);
+      border-top: 1px solid rgba(144, 160, 208, .17);
+      backdrop-filter: blur(18px);
+    }
+
+    #input {
+      min-width: 0;
+      flex: 1;
+      padding: 13px 17px;
+      border: 1px solid rgba(144, 160, 208, .25);
+      border-radius: 24px;
+      background: rgba(20, 27, 46, .95);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+    }
+    #input::placeholder { color: #7f8bab; }
+    #input:focus { border-color: #7c8cff; box-shadow: 0 0 0 3px rgba(124,140,255,.12); }
+
+    button {
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 22px;
+      padding: 12px 16px;
+      cursor: pointer;
+      color: white;
+      background: #5868e8;
+      transition: transform .18s ease, filter .18s ease, background .18s ease;
+    }
+    button:hover { filter: brightness(1.12); }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    #mic {
+      flex: 0 0 auto;
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7888ff, #4a55d5);
+      box-shadow: 0 0 22px rgba(96, 111, 255, .28);
+      font-size: 20px;
+    }
+    #mic.recording {
+      background: linear-gradient(135deg, #4ee1df, #168f9f);
+      box-shadow: 0 0 25px rgba(53, 218, 224, .35);
+    }
+
+    #attach-toggle {
+      position: relative;
+      flex: 0 0 auto;
+      background: rgba(20, 27, 46, .95);
+      color: #cbd4f5;
+      border: 1px solid rgba(144, 160, 208, .25);
+      font-size: 16px;
+    }
+    #attach-toggle.has-files::after {
+      content: attr(data-count);
+      position: absolute; top: -6px; right: -6px; min-width: 18px;
+      padding: 0 4px; border-radius: 9px; background: #53cbd7; color: #08121d;
+      font-size: 11px; line-height: 18px; text-align: center;
+    }
+
+    #attach-panel {
+      position: fixed; left: 14px; bottom: 86px;
+      width: min(340px, calc(100vw - 28px));
+      color: #e9edff; background: rgba(18, 24, 42, .97);
+      border: 1px solid rgba(144, 160, 208, .25); border-radius: 14px;
+      box-shadow: 0 10px 35px rgba(0,0,0,.4); overflow: hidden; z-index: 40; font-size: 14px;
+      backdrop-filter: blur(16px);
+    }
+    #attach-header { display:flex; align-items:center; justify-content:space-between; width:100%; padding:10px 14px; background:transparent; color:#e9edff; border:0; border-radius:0; font-size:14px; font-weight:600; }
+    #attach-header .chevron { transition:transform .18s ease; }
+    #attach-panel.collapsed #attach-header .chevron { transform:rotate(-90deg); }
+    #attach-body { max-height:340px; overflow-y:auto; border-top:1px solid rgba(144,160,208,.15); transition:max-height .18s ease,opacity .18s ease; }
+    #attach-panel.collapsed #attach-body { max-height:0; opacity:0; border-top-color:transparent; }
+    #drop-zone { display:block; margin:12px; padding:18px 12px; border:2px dashed #495578; border-radius:10px; text-align:center; color:#aab5d6; cursor:pointer; }
+    #drop-zone.dragover { border-color:#53dce2; background:rgba(83,220,226,.08); color:#53dce2; }
+    #drop-zone strong { color:#9daaff; }
+    #attach-list { list-style:none; margin:0; padding:0 12px; }
+    #attach-list li { display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; padding:8px 10px; border:1px solid rgba(144,160,208,.15); border-radius:10px; background:rgba(255,255,255,.03); }
+    #attach-list .meta { flex:1; min-width:0; }
+    #attach-list .name { display:block; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #attach-list .detail { color:#99a5c6; font-size:12px; }
+    #attach-list .detail.error { color:#ff8a9a; }
+    #attach-list .remove { background:transparent; color:#9ca8c7; border-radius:6px; padding:0 4px; font-size:15px; line-height:1.2; }
+    #attach-list .remove:hover { color:#ff8a9a; }
+    #attach-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 12px 12px; color:#99a5c6; font-size:12px; }
+    #attach-clear { background:rgba(255,255,255,.08); color:#d4dcf8; border-radius:8px; padding:6px 10px; font-size:12px; }
+    #attach-upload { padding:7px 10px; border-radius:8px; font-size:12px; }
+
+    @media (max-width: 560px) {
+      header { padding-top: 18px; }
+      #voice-stage { padding-top: 22px; }
+      #voice-visual { width: 154px; height: 154px; margin-top: 18px; }
+      #voice-orb { width: 86px; height: 86px; }
+      #controls { gap: 7px; padding: 10px; }
+      #mic { width: 44px; height: 44px; }
+      #controls > button[type="submit"] { padding: 11px 13px; }
+      #messages li { max-width: 94%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+
+  </style>
+</head>
+
+<body>
+  <header>
+    <h2>100x · AI Interview</h2>
+  </header>
+
+  <main id="voice-stage">
+    <div id="eyebrow">Your personal interview assistant</div>
+    <h1 id="voice-title">Let's talk about you.</h1>
+    <p id="voice-subtitle">Ask a question or tap the microphone to begin.</p>
+
+    <div id="voice-visual" data-state="idle" aria-label="Voice assistant status">
+      <span class="voice-ring ring-two"></span>
+      <span class="voice-ring ring-three"></span>
+      <span class="voice-ring"></span>
+      <div id="voice-orb" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/>
+        </svg>
+      </div>
+    </div>
+    <div id="status" role="status" aria-live="polite">Ready when you are</div>
+  </main>
+
+  <ul id="messages"></ul>
+
+  <form id="controls">
+        <button type="button" id="attach-toggle" title="Attach PDF or text files"
+            aria-expanded="false" aria-controls="attach-panel">📎</button>
+    <button type="button" id="mic" title="Start voice input">
+      🎤
+    </button>
+
+    <input
+      id="input"
+      placeholder="Type or speak..."
+      autocomplete="off"
+    >
+
+    <button type="submit">Send</button>
+  </form>
+     <section id="attach-panel" class="collapsed" aria-label="Attachments">
+    <button type="button" id="attach-header" aria-expanded="false" aria-controls="attach-body">
+      <span>Attachments <span id="attach-count"></span></span>
+      <span class="chevron">▾</span>
+    </button>
+
+    <div id="attach-body">
+      <label id="drop-zone" for="file-input">
+        <div><strong>Choose files</strong> or drop them here</div>
+        <div style="margin-top: 4px; font-size: 12px;">PDF or TXT · up to 10 MB each</div>
+      </label>
+
+      <input id="file-input" type="file" multiple hidden
+             accept=".pdf,.txt,text/plain,application/pdf">
+
+      <ul id="attach-list"></ul>
+
+      
+<div id="attach-footer" hidden>
+  <span id="attach-summary"></span>
+  <button type="button" id="attach-upload">Upload files</button>
+  <button type="button" id="attach-clear">Clear all</button>
+</div>
+
+    </div>
+  </section>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <script>
+  const socket = io();
+
+  socket.on('connect', () => setVoiceState('idle', 'Ready when you are'));
+  socket.on('connect_error', () => setVoiceState('thinking', 'Waking the server… this can take a minute'));
+
+const WARMUP_INTERVAL_MS = 10 * 60 * 1000;
+
+async function keepWarm() {
+  if (document.visibilityState === 'visible') {
+    try {
+      await fetch('/api/health', { cache: 'no-store' });
+    } catch {
+      // cold start or offline — next tick retries
+    }
+  }
+
+  setTimeout(keepWarm, WARMUP_INTERVAL_MS);
+}
+
+keepWarm();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    fetch('/api/health', { cache: 'no-store' }).catch(() => {});
+  }
+});
+
+
+ socket.on('stt-partial', ({ text }) => {
+  setVoiceState('listening', 'Listening · ' + text);
+});
+
+socket.on('stt-final', ({ text }) => {
+  console.log('Final transcript:', text);
+  setVoiceState('thinking', 'Got it · preparing your answer…');
+});
+
+socket.on('stt-empty', () => {
+  setVoiceState('idle', 'Didn\'t catch that — tap the mic and try again');
+});
+
+let assistantMessage = null;
+
+// Start a new assistant message
+socket.on('llm-start', () => {
+  setVoiceState('thinking', 'Thinking through your answer…');
+  assistantMessage = document.createElement('li');
+  assistantMessage.className = 'ai';
+  assistantMessage.textContent = '';
+  messages.appendChild(assistantMessage);
+});
+
+// Append each streamed token
+socket.on('llm-delta', ({ text }) => {
+  if (!assistantMessage) return;
+
+  assistantMessage.textContent += text;
+  assistantMessage.scrollIntoView({
+    behavior: 'smooth',
+    block: 'end'
+  });
+});
+
+// Full response received
+socket.on('llm-complete', ({ text }) => {
+  console.log('Complete LLM response:', text);
+  assistantMessage = null;
+  setVoiceState('idle', 'Answer ready · you can ask another question');
+});
+
+// Handle errors
+socket.on('llm-error', ({ message }) => {
+  setVoiceState('idle', message);
+  assistantMessage = null;
+});
+
+socket.on('stt-error', ({ message }) => {
+  console.error('STT error:', message);
+  setVoiceState('idle', 'Microphone error: ' + message);
+});
+
+/* Separate AudioContext for Cartesia TTS playback */
+
+const ttsAudioContext = new AudioContext({
+  sampleRate: 44100
+});
+
+let nextTtsAudioTime = 0;
+
+// Resume playback after a user gesture.
+// Call this from your mic button click handler too.
+async function resumeTTSPlayback() {
+  if (ttsAudioContext.state === 'suspended') {
+    await ttsAudioContext.resume();
+  }
+}
+
+// Cartesia sends raw PCM Float32 audio chunks.
+socket.on('tts-audio', async (data, metadata) => {
+  try {
+    setVoiceState('speaking', 'Speaking · listen to the answer');
+    await resumeTTSPlayback();
+
+    let arrayBuffer;
+
+    if (data instanceof ArrayBuffer) {
+      arrayBuffer = data;
+    } else if (ArrayBuffer.isView(data)) {
+      arrayBuffer = data.buffer.slice(
+        data.byteOffset,
+        data.byteOffset + data.byteLength
+      );
+    } else if (data?.type === 'Buffer' && Array.isArray(data.data)) {
+      arrayBuffer = new Uint8Array(data.data).buffer;
+    } else {
+      console.error('Unsupported TTS audio data:', data);
+      return;
+    }
+
+    // Interpret the received bytes as Float32 PCM samples.
+    const samples = new Float32Array(arrayBuffer);
+
+    const sampleRate = metadata?.sampleRate || 44100;
+
+    const audioBuffer = ttsAudioContext.createBuffer(
+      1,
+      samples.length,
+      sampleRate
+    );
+
+    audioBuffer.copyToChannel(samples, 0);
+
+    const source = ttsAudioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ttsAudioContext.destination);
+
+    // Schedule chunks sequentially to avoid gaps and overlap.
+    const startAt = Math.max(
+      nextTtsAudioTime,
+      ttsAudioContext.currentTime + 0.02
+    );
+
+    source.start(startAt);
+    nextTtsAudioTime = startAt + audioBuffer.duration;
+
+  } catch (error) {
+    console.error('TTS playback error:', error);
+  }
+});
+
+socket.on('tts-sentence-end', () => {
+  console.log('Cartesia finished generating a sentence');
+});
+
+socket.on('tts-error', ({ message }) => {
+  console.error('Cartesia TTS error:', message);
+  status.textContent = 'TTS error: ' + message;
+});
+
+
+  const mic = document.getElementById('mic');
+  const status = document.getElementById('status');
+  const voiceVisual = document.getElementById('voice-visual');
+
+  function setVoiceState(state, message) {
+    voiceVisual.dataset.state = state;
+    if (message) status.textContent = message;
+  }
+
+  let audioContext;
+  let microphone;
+  let audioWorklet;
+  let recording = false;
+
+  async function startRecording() {
+    try {
+      // Ask the user for microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+
+      audioContext = new AudioContext();
+      await audioContext.audioWorklet.addModule(
+        URL.createObjectURL(new Blob([`
+          class MicrophoneProcessor extends AudioWorkletProcessor {
+            process(inputs) {
+              const channel = inputs[0]?.[0];
+
+              if (channel) {
+                this.port.postMessage(new Float32Array(channel));
+              }
+
+              return true;
+            }
+          }
+
+          registerProcessor(
+            'microphone-processor',
+            MicrophoneProcessor
+          );
+        `], { type: 'application/javascript' }))
+      );
+
+      microphone = audioContext.createMediaStreamSource(stream);
+
+      audioWorklet = new AudioWorkletNode(
+        audioContext,
+        'microphone-processor'
+      );
+
+      // Tell the backend the audio format
+      socket.emit('audio-start', {
+        sampleRate: audioContext.sampleRate,
+        channels: 1,
+        encoding: 'pcm_f32le'
+      });
+
+      // Continuously stream audio chunks
+      audioWorklet.port.onmessage = (event) => {
+        if (!recording || !socket.connected) return;
+
+        socket.emit('audio-chunk', event.data.buffer);
+      };
+
+      microphone.connect(audioWorklet);
+
+      // Do not connect the microphone to audioContext.destination:
+      // that would play the microphone back through the speakers.
+
+      recording = true;
+      mic.textContent = '⏹';
+      mic.title = 'Stop listening';
+      mic.classList.add('recording');
+      setVoiceState('listening', 'Listening · speak naturally');
+
+      // Keep a reference to the stream for cleanup
+      mic.mediaStream = stream;
+
+    } catch (error) {
+      console.error('Microphone error:', error);
+      status.textContent = 'Could not access microphone';
+    }
+  }
+
+  async function stopRecording() {
+    recording = false;
+
+    if (audioWorklet) audioWorklet.disconnect();
+    if (microphone) microphone.disconnect();
+
+    if (mic.mediaStream) {
+      mic.mediaStream.getTracks().forEach(track => track.stop());
+      mic.mediaStream = null;
+    }
+
+    socket.emit('audio-stop');
+
+    if (audioContext) {
+      await audioContext.close();
+      audioContext = null;
+    }
+
+    mic.textContent = '🎤';
+    mic.title = 'Start voice input';
+    mic.classList.remove('recording');
+    setVoiceState('thinking', 'Listening stopped · processing your answer…');
+  }
+
+  mic.addEventListener('click', () => {
+    if (recording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  });
+  const controlsForm = document.getElementById('controls');
+  const textInput = document.getElementById('input');
+  const messageList = document.getElementById('messages');
+
+  controlsForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const text = textInput.value.trim();
+    if (!text) return;
+
+    if (recording) stopRecording();
+
+    const userMessage = document.createElement('li');
+    userMessage.className = 'user';
+    userMessage.textContent = text;
+    messageList.appendChild(userMessage);
+    userMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    textInput.value = '';
+
+    resumeTTSPlayback();
+    setVoiceState('thinking', 'Thinking through your answer…');
+
+    socket.emit('user-text', { text });
+  });
+
+    /* ---------- Collapsible attachment drawer ---------- */
+  
+  const ATTACH_MAX_BYTES = 10 * 1024 * 1024;
+  const ATTACH_ALLOWED_EXT = ['.pdf', '.txt'];
+  const ATTACH_CONTEXT_LIMIT = 12000; // characters handed to the model
+  
+  const attachPanel = document.getElementById('attach-panel');
+  const attachToggle = document.getElementById('attach-toggle');
+  const attachHeader = document.getElementById('attach-header');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const attachList = document.getElementById('attach-list');
+  const attachFooter = document.getElementById('attach-footer');
+  const attachSummary = document.getElementById('attach-summary');
+  const attachCount = document.getElementById('attach-count');
+  
+  const attachments = [];
+  
+  function setPanelOpen(open) {
+    attachPanel.classList.toggle('collapsed', !open);
+    attachToggle.setAttribute('aria-expanded', String(open));
+    attachHeader.setAttribute('aria-expanded', String(open));
+  }
+  
+  attachToggle.addEventListener('click', () =>
+    setPanelOpen(attachPanel.classList.contains('collapsed')));
+  
+  attachHeader.addEventListener('click', () =>
+    setPanelOpen(attachPanel.classList.contains('collapsed')));
+  
+  /* pdf.js is loaded on first PDF so voice-only sessions pay nothing */
+  let pdfjsPromise = null;
+  
+  function loadPdfJs() {
+    const version = '4.6.82';
+  
+    if (!pdfjsPromise) {
+      pdfjsPromise = import(
+        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.min.mjs`
+      ).then((pdfjs) => {
+        pdfjs.GlobalWorkerOptions.workerSrc =
+          `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
+        return pdfjs;
+      });
+    }
+  
+    return pdfjsPromise;
+  }
+  
+  
+  
+async function addFiles(fileList) {
+  for (const file of fileList) {
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!ATTACH_ALLOWED_EXT.includes(ext)) {
+      status.textContent = `Unsupported file type: ${file.name}`;
+      continue;
+    }
+
+    if (file.size > ATTACH_MAX_BYTES) {
+      status.textContent = `${file.name} is larger than 10 MB`;
+      continue;
+    }
+
+    // Avoid adding the same file twice.
+    if (attachments.some(entry =>
+      entry.name === file.name &&
+      entry.size === file.size
+    )) {
+      continue;
+    }
+
+    attachments.push({
+      id: crypto.randomUUID(),
+      name: file.name,
+      size: file.size,
+      file,
+      state: 'ready',
+      text: ''
+    });
+  }
+
+  renderAttachments();
+}
+
+  
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+  
+  function renderAttachments() {
+    attachList.textContent = '';
+  
+    for (const entry of attachments) {
+      const li = document.createElement('li');
+  
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+  
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = entry.name;
+  
+      const detail = document.createElement('span');
+      detail.className = 'detail';
+  
+      
+      if (entry.state === 'uploading') {
+        detail.textContent = `${formatBytes(entry.size)} · uploading and indexing…`;
+      } else if (entry.state === 'uploaded') {
+        detail.textContent = `${formatBytes(entry.size)} · uploaded and indexed`;
+      } else if (entry.state === 'error') {
+        detail.classList.add('error');
+        detail.textContent = entry.error || 'Upload failed';
+      } else {
+        detail.textContent = `${formatBytes(entry.size)} · ready to upload`;
+      }
+
+  
+      meta.append(name, detail);
+  
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'remove';
+      remove.title = `Remove ${entry.name}`;
+      remove.textContent = '✕';
+      remove.addEventListener('click', () => {
+        attachments.splice(attachments.indexOf(entry), 1);
+        renderAttachments();
+      });
+  
+      li.append(meta, remove);
+      attachList.appendChild(li);
+    }
+  
+    const ready = attachments.filter(entry => entry.state === 'ready');
+
+    attachFooter.hidden = attachments.length === 0;
+    attachSummary.textContent = `${ready.length} ready to upload`;
+  
+    attachToggle.classList.toggle('has-files', attachments.length > 0);
+    attachToggle.dataset.count = String(attachments.length);
+    attachCount.textContent = attachments.length ? `(${attachments.length})` : '';
+  }
+  
+  /* The drop zone is a <label>, so a click opens the picker natively. */
+  fileInput.addEventListener('change', () => {
+    addFiles(fileInput.files);
+    fileInput.value = '';
+  });
+  
+  ['dragenter', 'dragover'].forEach((type) => {
+    dropZone.addEventListener(type, (event) => {
+      event.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+  });
+  
+  ['dragleave', 'drop'].forEach((type) => {
+    dropZone.addEventListener(type, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove('dragover');
+    });
+  });
+  
+  dropZone.addEventListener('drop', (event) => {
+    addFiles(event.dataTransfer.files);
+    setPanelOpen(true);
+  });
+  
+  document.getElementById('attach-clear').addEventListener('click', () => {
+    attachments.length = 0;
+    renderAttachments();
+  });
+  
+  /* Concatenated, size-capped text for the next prompt. */
+  function getAttachmentContext(limit = ATTACH_CONTEXT_LIMIT) {
+    let context = '';
+  
+    for (const entry of attachments) {
+      if (entry.state !== 'ready') continue;
+  
+      const block = `--- ${entry.name} ---\n${entry.text}\n\n`;
+  
+      if (context.length + block.length > limit) {
+        context += block.slice(0, Math.max(0, limit - context.length)) + '\n[truncated]\n';
+        break;
+      }
+  
+      context += block;
+    }
+  
+    return context.trim();
+  }
+  
+  window.getAttachmentContext = getAttachmentContext;
+  window.attachments = attachments;
+
+
+  
+document.getElementById('attach-upload').addEventListener('click', async () => {
+  const button = document.getElementById('attach-upload');
+  const readyFiles = attachments.filter(entry => entry.state === 'ready');
+
+  if (!readyFiles.length) {
+    status.textContent = 'Choose a file first.';
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    for (const entry of readyFiles) {
+      entry.state = 'uploading';
+      renderAttachments();
+
+      const formData = new FormData();
+      formData.append('document', entry.file);
+
+      try {
+        const response = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        entry.state = 'uploaded';
+        entry.error = '';
+      } catch (error) {
+        entry.state = 'error';
+        entry.error = error.message;
+      }
+
+      renderAttachments();
+    }
+
+    status.textContent = 'File upload processing finished.';
+  } finally {
+    button.disabled = false;
+  }
+});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,796 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Voice Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+    @layer components {  
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #f5f6fa;
+      color: #222;
+    }
+
+    header {
+      padding: 18px;
+      background: #222;
+      color: white;
+      text-align: center;
+    }
+
+    #status {
+      text-align: center;
+      padding: 12px;
+      color: #666;
+    }
+
+    #messages {
+      list-style: none;
+      padding: 16px;
+      margin: 0;
+      padding-bottom: 150px;
+    }
+
+    #messages li {
+      padding: 12px 16px;
+      margin: 10px 0;
+      border-radius: 12px;
+      max-width: 80%;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .user {
+      background: #d8eaff;
+      margin-left: auto !important;
+    }
+
+    .ai {
+      background: white;
+      border: 1px solid #ddd;
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      gap: 8px;
+      padding: 14px;
+      background: white;
+      border-top: 1px solid #ddd;
+    }
+
+    #input {
+      min-width: 0;
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 22px;
+      font-size: 16px;
+    }
+
+    button {
+      border: none;
+      border-radius: 22px;
+      padding: 12px 16px;
+      cursor: pointer;
+      color: white;
+      background: #333;
+    }
+
+    #mic {
+      background: #1769e0;
+      font-size: 18px;
+    }
+
+    #mic.recording {
+      background: #d62828;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+        /* Attachments drawer */
+    #attach-toggle {
+      position: relative;
+      background: #fff;
+      color: #333;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    #attach-toggle.has-files::after {
+      content: attr(data-count);
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      min-width: 18px;
+      padding: 0 4px;
+      border-radius: 9px;
+      background: #1769e0;
+      color: #fff;
+      font-size: 11px;
+      line-height: 18px;
+      text-align: center;
+    }
+
+    #attach-panel {
+      position: fixed;
+      left: 14px;
+      bottom: 86px;
+      width: min(340px, calc(100vw - 28px));
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      z-index: 20;
+      font-size: 14px;
+    }
+
+    #attach-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 10px 14px;
+      background: #fff;
+      color: #222;
+      border: none;
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    #attach-header .chevron {
+      transition: transform 0.18s ease;
+    }
+
+    #attach-panel.collapsed #attach-header .chevron {
+      transform: rotate(-90deg);
+    }
+
+    #attach-body {
+      max-height: 340px;
+      overflow-y: auto;
+      border-top: 1px solid #eee;
+      transition: max-height 0.18s ease, opacity 0.18s ease;
+    }
+
+    #attach-panel.collapsed #attach-body {
+      max-height: 0;
+      opacity: 0;
+      border-top-color: transparent;
+    }
+
+    #drop-zone {
+      display: block;
+      margin: 12px;
+      padding: 18px 12px;
+      border: 2px dashed #c9d2e3;
+      border-radius: 10px;
+      text-align: center;
+      color: #667;
+      cursor: pointer;
+    }
+
+    #drop-zone.dragover {
+      border-color: #1769e0;
+      background: #eef5ff;
+      color: #1769e0;
+    }
+
+    #drop-zone strong { color: #1769e0; }
+
+    #attach-list { list-style: none; margin: 0; padding: 0 12px; }
+
+    #attach-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      background: #fafbfd;
+    }
+
+    #attach-list .meta { flex: 1; min-width: 0; }
+
+    #attach-list .name {
+      display: block;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #attach-list .detail { color: #777; font-size: 12px; }
+    #attach-list .detail.error { color: #d62828; }
+
+    #attach-list .remove {
+      background: transparent;
+      color: #888;
+      border-radius: 6px;
+      padding: 0 4px;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    #attach-list .remove:hover { color: #d62828; }
+
+    #attach-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 12px 12px;
+      color: #777;
+      font-size: 12px;
+    }
+
+    #attach-clear {
+      background: #eee;
+      color: #444;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+  }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h2>AI Voice Chat</h2>
+  </header>
+
+  <div id="status">Welcome to AI Voice Chat!</div>
+
+  <ul id="messages"></ul>
+
+  <form id="controls">
+        <button type="button" id="attach-toggle" title="Attach PDF or text files"
+            aria-expanded="false" aria-controls="attach-panel">📎</button>
+    <button type="button" id="mic" title="Start voice input">
+      🎤
+    </button>
+
+    <input
+      id="input"
+      placeholder="Type or speak..."
+      autocomplete="off"
+    >
+
+    <button type="submit">Send</button>
+  </form>
+     <section id="attach-panel" class="collapsed" aria-label="Attachments">
+    <button type="button" id="attach-header" aria-expanded="false" aria-controls="attach-body">
+      <span>Attachments <span id="attach-count"></span></span>
+      <span class="chevron">▾</span>
+    </button>
+
+    <div id="attach-body">
+      <label id="drop-zone" for="file-input">
+        <div><strong>Choose files</strong> or drop them here</div>
+        <div style="margin-top: 4px; font-size: 12px;">PDF or TXT · up to 10 MB each</div>
+      </label>
+
+      <input id="file-input" type="file" multiple hidden
+             accept=".pdf,.txt,text/plain,application/pdf">
+
+      <ul id="attach-list"></ul>
+
+      
+<div id="attach-footer" hidden>
+  <span id="attach-summary"></span>
+  <button type="button" id="attach-upload">Upload files</button>
+  <button type="button" id="attach-clear">Clear all</button>
+</div>
+
+    </div>
+  </section>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <script>
+  const socket = io('http://localhost:3000');
+
+ socket.on('stt-partial', ({ text }) => {
+  status.textContent = 'Recognizing: ' + text;
+});
+
+socket.on('stt-final', ({ text }) => {
+  console.log('Final transcript:', text);
+  status.textContent = 'You said: ' + text;
+});
+
+let assistantMessage = null;
+
+// Start a new assistant message
+socket.on('llm-start', () => {
+  assistantMessage = document.createElement('li');
+  assistantMessage.className = 'ai';
+  assistantMessage.textContent = '';
+  messages.appendChild(assistantMessage);
+});
+
+// Append each streamed token
+socket.on('llm-delta', ({ text }) => {
+  if (!assistantMessage) return;
+
+  assistantMessage.textContent += text;
+  assistantMessage.scrollIntoView({
+    behavior: 'smooth',
+    block: 'end'
+  });
+});
+
+// Full response received
+socket.on('llm-complete', ({ text }) => {
+  console.log('Complete LLM response:', text);
+  assistantMessage = null;
+});
+
+// Handle errors
+socket.on('llm-error', ({ message }) => {
+  status.textContent = message;
+  assistantMessage = null;
+});
+
+socket.on('stt-error', ({ message }) => {
+  console.error('STT error:', message);
+  status.textContent = 'STT error: ' + message;
+});
+
+/* Separate AudioContext for Cartesia TTS playback */
+
+const ttsAudioContext = new AudioContext({
+  sampleRate: 44100
+});
+
+let nextTtsAudioTime = 0;
+
+// Resume playback after a user gesture.
+// Call this from your mic button click handler too.
+async function resumeTTSPlayback() {
+  if (ttsAudioContext.state === 'suspended') {
+    await ttsAudioContext.resume();
+  }
+}
+
+// Cartesia sends raw PCM Float32 audio chunks.
+socket.on('tts-audio', async (data, metadata) => {
+  try {
+    await resumeTTSPlayback();
+
+    let arrayBuffer;
+
+    if (data instanceof ArrayBuffer) {
+      arrayBuffer = data;
+    } else if (ArrayBuffer.isView(data)) {
+      arrayBuffer = data.buffer.slice(
+        data.byteOffset,
+        data.byteOffset + data.byteLength
+      );
+    } else if (data?.type === 'Buffer' && Array.isArray(data.data)) {
+      arrayBuffer = new Uint8Array(data.data).buffer;
+    } else {
+      console.error('Unsupported TTS audio data:', data);
+      return;
+    }
+
+    // Interpret the received bytes as Float32 PCM samples.
+    const samples = new Float32Array(arrayBuffer);
+
+    const sampleRate = metadata?.sampleRate || 44100;
+
+    const audioBuffer = ttsAudioContext.createBuffer(
+      1,
+      samples.length,
+      sampleRate
+    );
+
+    audioBuffer.copyToChannel(samples, 0);
+
+    const source = ttsAudioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ttsAudioContext.destination);
+
+    // Schedule chunks sequentially to avoid gaps and overlap.
+    const startAt = Math.max(
+      nextTtsAudioTime,
+      ttsAudioContext.currentTime + 0.02
+    );
+
+    source.start(startAt);
+    nextTtsAudioTime = startAt + audioBuffer.duration;
+
+  } catch (error) {
+    console.error('TTS playback error:', error);
+  }
+});
+
+socket.on('tts-sentence-end', () => {
+  console.log('Cartesia finished generating a sentence');
+});
+
+socket.on('tts-error', ({ message }) => {
+  console.error('Cartesia TTS error:', message);
+  status.textContent = 'TTS error: ' + message;
+});
+
+
+  const mic = document.getElementById('mic');
+  const status = document.getElementById('status');
+
+  let audioContext;
+  let microphone;
+  let audioWorklet;
+  let recording = false;
+
+  async function startRecording() {
+    try {
+      // Ask the user for microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+
+      audioContext = new AudioContext();
+      await audioContext.audioWorklet.addModule(
+        URL.createObjectURL(new Blob([`
+          class MicrophoneProcessor extends AudioWorkletProcessor {
+            process(inputs) {
+              const channel = inputs[0]?.[0];
+
+              if (channel) {
+                this.port.postMessage(new Float32Array(channel));
+              }
+
+              return true;
+            }
+          }
+
+          registerProcessor(
+            'microphone-processor',
+            MicrophoneProcessor
+          );
+        `], { type: 'application/javascript' }))
+      );
+
+      microphone = audioContext.createMediaStreamSource(stream);
+
+      audioWorklet = new AudioWorkletNode(
+        audioContext,
+        'microphone-processor'
+      );
+
+      // Tell the backend the audio format
+      socket.emit('audio-start', {
+        sampleRate: audioContext.sampleRate,
+        channels: 1,
+        encoding: 'pcm_f32le'
+      });
+
+      // Continuously stream audio chunks
+      audioWorklet.port.onmessage = (event) => {
+        if (!recording || !socket.connected) return;
+
+        socket.emit('audio-chunk', event.data.buffer);
+      };
+
+      microphone.connect(audioWorklet);
+
+      // Do not connect the microphone to audioContext.destination:
+      // that would play the microphone back through the speakers.
+
+      recording = true;
+      mic.textContent = '⏹ Stop';
+      mic.classList.add('recording');
+      status.textContent = 'Streaming microphone audio...';
+
+      // Keep a reference to the stream for cleanup
+      mic.mediaStream = stream;
+
+    } catch (error) {
+      console.error('Microphone error:', error);
+      status.textContent = 'Could not access microphone';
+    }
+  }
+
+  async function stopRecording() {
+    recording = false;
+
+    if (audioWorklet) audioWorklet.disconnect();
+    if (microphone) microphone.disconnect();
+
+    if (mic.mediaStream) {
+      mic.mediaStream.getTracks().forEach(track => track.stop());
+      mic.mediaStream = null;
+    }
+
+    socket.emit('audio-stop');
+
+    if (audioContext) {
+      await audioContext.close();
+      audioContext = null;
+    }
+
+    mic.textContent = '🎤';
+    mic.classList.remove('recording');
+    status.textContent = 'Recording stopped';
+  }
+
+  mic.addEventListener('click', () => {
+    if (recording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  });
+
+    /* ---------- Collapsible attachment drawer ---------- */
+  
+  const ATTACH_MAX_BYTES = 10 * 1024 * 1024;
+  const ATTACH_ALLOWED_EXT = ['.pdf', '.txt'];
+  const ATTACH_CONTEXT_LIMIT = 12000; // characters handed to the model
+  
+  const attachPanel = document.getElementById('attach-panel');
+  const attachToggle = document.getElementById('attach-toggle');
+  const attachHeader = document.getElementById('attach-header');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const attachList = document.getElementById('attach-list');
+  const attachFooter = document.getElementById('attach-footer');
+  const attachSummary = document.getElementById('attach-summary');
+  const attachCount = document.getElementById('attach-count');
+  
+  const attachments = [];
+  
+  function setPanelOpen(open) {
+    attachPanel.classList.toggle('collapsed', !open);
+    attachToggle.setAttribute('aria-expanded', String(open));
+    attachHeader.setAttribute('aria-expanded', String(open));
+  }
+  
+  attachToggle.addEventListener('click', () =>
+    setPanelOpen(attachPanel.classList.contains('collapsed')));
+  
+  attachHeader.addEventListener('click', () =>
+    setPanelOpen(attachPanel.classList.contains('collapsed')));
+  
+  /* pdf.js is loaded on first PDF so voice-only sessions pay nothing */
+  let pdfjsPromise = null;
+  
+  function loadPdfJs() {
+    const version = '4.6.82';
+  
+    if (!pdfjsPromise) {
+      pdfjsPromise = import(
+        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.min.mjs`
+      ).then((pdfjs) => {
+        pdfjs.GlobalWorkerOptions.workerSrc =
+          `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
+        return pdfjs;
+      });
+    }
+  
+    return pdfjsPromise;
+  }
+  
+  
+  
+async function addFiles(fileList) {
+  for (const file of fileList) {
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!ATTACH_ALLOWED_EXT.includes(ext)) {
+      status.textContent = `Unsupported file type: ${file.name}`;
+      continue;
+    }
+
+    if (file.size > ATTACH_MAX_BYTES) {
+      status.textContent = `${file.name} is larger than 10 MB`;
+      continue;
+    }
+
+    // Avoid adding the same file twice.
+    if (attachments.some(entry =>
+      entry.name === file.name &&
+      entry.size === file.size
+    )) {
+      continue;
+    }
+
+    attachments.push({
+      id: crypto.randomUUID(),
+      name: file.name,
+      size: file.size,
+      file,
+      state: 'ready',
+      text: ''
+    });
+  }
+
+  renderAttachments();
+}
+
+  
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+  
+  function renderAttachments() {
+    attachList.textContent = '';
+  
+    for (const entry of attachments) {
+      const li = document.createElement('li');
+  
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+  
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = entry.name;
+  
+      const detail = document.createElement('span');
+      detail.className = 'detail';
+  
+      
+      if (entry.state === 'uploading') {
+        detail.textContent = `${formatBytes(entry.size)} · uploading and indexing…`;
+      } else if (entry.state === 'uploaded') {
+        detail.textContent = `${formatBytes(entry.size)} · uploaded and indexed`;
+      } else if (entry.state === 'error') {
+        detail.classList.add('error');
+        detail.textContent = entry.error || 'Upload failed';
+      } else {
+        detail.textContent = `${formatBytes(entry.size)} · ready to upload`;
+      }
+
+  
+      meta.append(name, detail);
+  
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'remove';
+      remove.title = `Remove ${entry.name}`;
+      remove.textContent = '✕';
+      remove.addEventListener('click', () => {
+        attachments.splice(attachments.indexOf(entry), 1);
+        renderAttachments();
+      });
+  
+      li.append(meta, remove);
+      attachList.appendChild(li);
+    }
+  
+    const ready = attachments.filter(entry => entry.state === 'ready');
+
+    attachFooter.hidden = attachments.length === 0;
+    attachSummary.textContent = `${ready.length} ready to upload`;
+  
+    attachToggle.classList.toggle('has-files', attachments.length > 0);
+    attachToggle.dataset.count = String(attachments.length);
+    attachCount.textContent = attachments.length ? `(${attachments.length})` : '';
+  }
+  
+  /* The drop zone is a <label>, so a click opens the picker natively. */
+  fileInput.addEventListener('change', () => {
+    addFiles(fileInput.files);
+    fileInput.value = '';
+  });
+  
+  ['dragenter', 'dragover'].forEach((type) => {
+    dropZone.addEventListener(type, (event) => {
+      event.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+  });
+  
+  ['dragleave', 'drop'].forEach((type) => {
+    dropZone.addEventListener(type, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove('dragover');
+    });
+  });
+  
+  dropZone.addEventListener('drop', (event) => {
+    addFiles(event.dataTransfer.files);
+    setPanelOpen(true);
+  });
+  
+  document.getElementById('attach-clear').addEventListener('click', () => {
+    attachments.length = 0;
+    renderAttachments();
+  });
+  
+  /* Concatenated, size-capped text for the next prompt. */
+  function getAttachmentContext(limit = ATTACH_CONTEXT_LIMIT) {
+    let context = '';
+  
+    for (const entry of attachments) {
+      if (entry.state !== 'ready') continue;
+  
+      const block = `--- ${entry.name} ---\n${entry.text}\n\n`;
+  
+      if (context.length + block.length > limit) {
+        context += block.slice(0, Math.max(0, limit - context.length)) + '\n[truncated]\n';
+        break;
+      }
+  
+      context += block;
+    }
+  
+    return context.trim();
+  }
+  
+  window.getAttachmentContext = getAttachmentContext;
+  window.attachments = attachments;
+
+
+  
+document.getElementById('attach-upload').addEventListener('click', async () => {
+  const button = document.getElementById('attach-upload');
+  const readyFiles = attachments.filter(entry => entry.state === 'ready');
+
+  if (!readyFiles.length) {
+    status.textContent = 'Choose a file first.';
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    for (const entry of readyFiles) {
+      entry.state = 'uploading';
+      renderAttachments();
+
+      const formData = new FormData();
+      formData.append('document', entry.file);
+
+      try {
+        const response = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        entry.state = 'uploaded';
+        entry.error = '';
+      } catch (error) {
+        entry.state = 'error';
+        entry.error = error.message;
+      }
+
+      renderAttachments();
+    }
+
+    status.textContent = 'File upload processing finished.';
+  } finally {
+    button.disabled = false;
+  }
+});
+
+</script>
+</body>
+</html>
